@@ -1,0 +1,75 @@
+(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-N8JQ8P74');
+
+import {register} from '@shopify/web-pixels-extension';
+
+register(({analytics}) => {
+  analytics.subscribe('checkout_completed', (event) => {
+    const checkout = event.data.checkout;
+
+    // Extract necessary data
+    const transactionId = checkout.orderId || 'Unknown ID';
+    const currency = checkout.currencyCode || 'CAD';
+    const value = parseFloat(checkout.totalPrice?.amount) || 0;
+    const tax = parseFloat(checkout.totalTaxAmount?.amount) || 0;
+    const shipping = parseFloat(checkout.totalShippingPrice?.amount) || 0;
+    const coupon = checkout.discountApplications
+      .filter(discount => discount.type === 'DISCOUNT_CODE')
+      .map(discount => discount.title)
+      .join(', ') || null;
+
+    const items = checkout.lineItems.map(item => ({
+      item_name: item.title || 'Unknown Product',
+      item_id: item.id || 'Unknown ID',
+      price: parseFloat(item.price?.amount) || 0,
+      item_brand: item.vendor || 'Unknown Brand',
+      item_category: item.productType || 'Uncategorized',
+      item_variant: item.variantTitle || null,
+      quantity: item.quantity || 1,
+    }));
+
+    // Push to dataLayer
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'checkout_completed',
+      ecommerce: {
+        transaction_id: transactionId,
+        currency: currency,
+        value: value,
+        tax: tax,
+        shipping: shipping,
+        coupon: coupon,
+        items: items,
+      },
+    });
+  });
+});
+
+// Listen for add_to_cart events
+window.dataLayer = window.dataLayer || [];
+
+// Listen for product added to cart events
+analytics.subscribe("product_added_to_cart", (event) => {
+  const cartLine = event.data.cartLine;
+
+  window.dataLayer.push({
+    event: "product_added_to_cart", // Shopify's standard event for adding to cart
+    ecommerce: {
+      items: [
+        {
+          currency: cartLine.cost?.totalAmount?.currencyCode || "CAD", // Currency code (default to CAD if unavailable)
+          item_name: cartLine.merchandise?.title || "Unknown Product", // Product name
+          item_id: cartLine.merchandise?.id || "Unknown ID",           // Product ID
+          price: cartLine.cost?.totalAmount?.amount || 0,              // Product price
+          item_brand: cartLine.merchandise?.product?.vendor || "Unknown Brand", // Product brand
+          item_category: cartLine.merchandise?.product?.type || "Uncategorized", // Product category
+          item_variant: cartLine.merchandise?.title || null,          // Variant (if applicable)
+          quantity: cartLine.quantity || 1                           // Quantity added
+        }
+      ]
+    }
+  });
+});
